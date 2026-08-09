@@ -1080,8 +1080,33 @@ io.on("connection", (socket) => {
       return;
     }
 
-    game.currentPlayerId = game.pendingNextPlayerId || game.currentPlayerId;
-    game.turnIndex = game.pendingTurnIndex ?? game.turnIndex;
+    const players = getLobbyPlayers(lobbyCode);
+    const pendingPlayerIndex = players.findIndex(
+      (player) => player.id === game.pendingNextPlayerId,
+    );
+    const currentPlayerIndex = players.findIndex(
+      (player) => player.id === game.currentPlayerId,
+    );
+    const fallbackTurnIndex =
+      players.length > 0
+        ? ((game.pendingTurnIndex ?? game.turnIndex ?? 0) % players.length + players.length) %
+          players.length
+        : -1;
+
+    if (pendingPlayerIndex !== -1) {
+      game.currentPlayerId = players[pendingPlayerIndex].id;
+      game.turnIndex = pendingPlayerIndex;
+    } else if (currentPlayerIndex !== -1) {
+      game.currentPlayerId = players[currentPlayerIndex].id;
+      game.turnIndex = currentPlayerIndex;
+    } else if (fallbackTurnIndex !== -1) {
+      game.currentPlayerId = players[fallbackTurnIndex].id;
+      game.turnIndex = fallbackTurnIndex;
+    } else {
+      game.currentPlayerId = null;
+      game.turnIndex = 0;
+    }
+
     game.pendingNextPlayerId = null;
     game.pendingTurnIndex = null;
     game.pendingLandingPosition = null;
