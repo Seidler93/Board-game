@@ -209,13 +209,14 @@
 
 .board-length-button {
   min-width: 0;
-  aspect-ratio: 1;
+  min-height: clamp(38px, 6dvh, 54px);
+  padding: 0 4px;
   border: 2px solid #333;
   border-radius: 10px;
   background: #202020;
   color: white;
   cursor: pointer;
-  font-size: clamp(16px, 2.8dvh, 24px);
+  font-size: clamp(13px, 2.2dvh, 20px);
   font-weight: 900;
   line-height: 1;
 }

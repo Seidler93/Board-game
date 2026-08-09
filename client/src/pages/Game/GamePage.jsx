@@ -4,7 +4,7 @@ import socket from "../../socket";
 import GameBoard from "./GameBoard";
 
 const DEFAULT_LOBBY_CODE = "ABCD";
-const DEFAULT_BOARD_ROWS = 9;
+const DEFAULT_BOARD_SIZE = { columns: 10, rows: 9 };
 
 function GamePage() {
   const [players, setPlayers] = useState([]);
@@ -38,7 +38,7 @@ function GamePage() {
   const [chase, setChase] = useState(null);
   const [chaseResult, setChaseResult] = useState(null);
   const [winner, setWinner] = useState(null);
-  const [selectedBoardRows, setSelectedBoardRows] = useState(DEFAULT_BOARD_ROWS);
+  const [selectedBoardSize, setSelectedBoardSize] = useState(DEFAULT_BOARD_SIZE);
   const lobbyCode =
     new URLSearchParams(window.location.search).get("lobby")?.toUpperCase() ||
     DEFAULT_LOBBY_CODE;
@@ -526,8 +526,8 @@ function GamePage() {
       <GameBoard
         players={players}
         positions={gameState?.positions || {}}
-        boardColumns={gameState?.boardColumns || 10}
-        boardRows={gameState?.boardRows || DEFAULT_BOARD_ROWS}
+        boardColumns={gameState?.boardColumns || DEFAULT_BOARD_SIZE.columns}
+        boardRows={gameState?.boardRows || DEFAULT_BOARD_SIZE.rows}
         currentPlayerId={gameState?.currentPlayerId || ""}
         lastRoll={lastRoll}
         trivia={trivia}
@@ -591,7 +591,10 @@ function GamePage() {
           setWinner(null);
           socket.emit("restartGame", {
             lobbyCode,
-            boardRows: gameState?.boardRows || selectedBoardRows,
+            boardSize: {
+              columns: gameState?.boardColumns || selectedBoardSize.columns,
+              rows: gameState?.boardRows || selectedBoardSize.rows,
+            },
           });
         }}
         onQuit={() => {
@@ -612,19 +615,19 @@ function GamePage() {
     <Lobby
       players={players}
       lobbyCode={lobbyCode}
-      boardRows={selectedBoardRows}
-      onBoardRowsChange={setSelectedBoardRows}
+      boardSize={selectedBoardSize}
+      onBoardSizeChange={setSelectedBoardSize}
       onStart={() => {
         socket.emit("startGame", {
           lobbyCode,
-          boardRows: selectedBoardRows,
+          boardSize: selectedBoardSize,
         });
       }}
       onStartMiniGame={(miniGameType) => {
         socket.emit("startTestMiniGame", {
           lobbyCode,
           miniGameType,
-          boardRows: selectedBoardRows,
+          boardSize: selectedBoardSize,
         });
       }}
     />

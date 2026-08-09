@@ -87,10 +87,14 @@ const io = new Server(server, {
 
 const games = new Map();
 const lobbyRosters = new Map();
-const BOARD_COLUMNS = 10;
-const DEFAULT_BOARD_ROWS = 9;
-const MIN_BOARD_ROWS = 3;
-const MAX_BOARD_ROWS = 9;
+const MAX_BOARD_TILES = 90;
+const DEFAULT_BOARD_CONFIG = { columns: 10, rows: 9 };
+const BOARD_SIZE_OPTIONS = [
+  { columns: 5, rows: 5 },
+  { columns: 7, rows: 7 },
+  { columns: 9, rows: 9 },
+  DEFAULT_BOARD_CONFIG,
+];
 const ROLL_STEP_MS = 280;
 const TRIVIA_PENALTY_REVEAL_MS = 1200;
 const TRIVIA_TILE_POSITIONS = new Set([6, 14, 23, 31, 42, 55, 67, 76, 88]);
@@ -134,19 +138,28 @@ const PRESS_RELEASE_DURATION_MS = 15000;
 const PRESS_RELEASE_MIN_TARGET_MS = 5000;
 const PRESS_RELEASE_MAX_TARGET_MS = 10000;
 
-function normalizeBoardRows(boardRows) {
-  const numericRows = Number(boardRows);
+function normalizeBoardConfig(boardConfig = {}) {
+  const requestedColumns = Number(boardConfig.columns);
+  const requestedRows = Number(boardConfig.rows ?? boardConfig.boardRows);
+  const exactMatch = BOARD_SIZE_OPTIONS.find(
+    (option) =>
+      option.columns === requestedColumns &&
+      option.rows === requestedRows,
+  );
 
-  if (!Number.isFinite(numericRows)) return DEFAULT_BOARD_ROWS;
+  if (exactMatch) return exactMatch;
 
-  const roundedRows = Math.round(numericRows);
-  const clampedRows = Math.max(MIN_BOARD_ROWS, Math.min(MAX_BOARD_ROWS, roundedRows));
+  const legacyRowsMatch = BOARD_SIZE_OPTIONS.find(
+    (option) => option.columns === option.rows && option.rows === requestedRows,
+  );
 
-  return clampedRows % 2 === 0 ? clampedRows - 1 : clampedRows;
+  return legacyRowsMatch || DEFAULT_BOARD_CONFIG;
 }
 
 function getBoardTileCount(game) {
-  return BOARD_COLUMNS * normalizeBoardRows(game?.boardRows);
+  const boardConfig = normalizeBoardConfig(game);
+
+  return boardConfig.columns * boardConfig.rows;
 }
 
 const triviaTimers = new Map();
@@ -1348,17 +1361,21 @@ io.on("connection", (socket) => {
     });
   }
 
-  function createBaseGame(lobbyCode, players, testMode = false, boardRows = DEFAULT_BOARD_ROWS) {
-    const normalizedBoardRows = normalizeBoardRows(boardRows);
+  function createBaseGame(lobbyCode, players, testMode = false, boardConfig = DEFAULT_BOARD_CONFIG) {
+    const normalizedBoardConfig = normalizeBoardConfig(boardConfig);
+    const tileCount = Math.min(
+      MAX_BOARD_TILES,
+      normalizedBoardConfig.columns * normalizedBoardConfig.rows,
+    );
 
     return {
       lobbyCode,
       started: true,
       testMode,
       testModeEnding: false,
-      boardColumns: BOARD_COLUMNS,
-      boardRows: normalizedBoardRows,
-      tileCount: BOARD_COLUMNS * normalizedBoardRows,
+      boardColumns: normalizedBoardConfig.columns,
+      boardRows: normalizedBoardConfig.rows,
+      tileCount,
       paused: false,
       pausedPlayerIds: [],
       currentPlayerId: testMode ? null : players[0]?.id || null,
@@ -3789,12 +3806,12 @@ io.on("connection", (socket) => {
     acknowledge?.({ ok: Boolean(removedPlayer) });
   });
 
-  socket.on("startGame", ({ lobbyCode, boardRows }) => {
+  socket.on("startGame", ({ lobbyCode, boardRows, boardSize }) => {
     const players = getLobbyPlayers(lobbyCode);
 
     if (players.length === 0 || players.some((player) => !player.connected)) return;
 
-    const game = createBaseGame(lobbyCode, players, false, boardRows);
+    const game = createBaseGame(lobbyCode, players, false, boardSize || { boardRows });
 
     clearTriviaTimer(lobbyCode);
     clearMostLikelyTimer(lobbyCode);
@@ -3814,7 +3831,7 @@ io.on("connection", (socket) => {
     emitGameState(lobbyCode);
   });
 
-  socket.on("startTestMiniGame", ({ lobbyCode, miniGameType, boardRows }) => {
+  socket.on("startTestMiniGame", ({ lobbyCode, miniGameType, boardRows, boardSize }) => {
     const players = getLobbyPlayers(lobbyCode);
 
     if (players.length === 0 || players.some((player) => !player.connected)) return;
@@ -3834,7 +3851,7 @@ io.on("connection", (socket) => {
     clearChaseTimer(lobbyCode);
     clearTurnResolutionTimer(lobbyCode);
 
-    const game = createBaseGame(lobbyCode, players, true, boardRows);
+    const game = createBaseGame(lobbyCode, players, true, boardSize || { boardRows });
 
     games.set(lobbyCode, game);
     emitGameState(lobbyCode);
@@ -3845,7 +3862,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("restartGame", ({ lobbyCode, boardRows }) => {
+  socket.on("restartGame", ({ lobbyCode, boardRows, boardSize }) => {
     const players = getLobbyPlayers(lobbyCode);
 
     if (players.length === 0 || players.some((player) => !player.connected)) return;
@@ -3855,7 +3872,7 @@ io.on("connection", (socket) => {
       lobbyCode,
       players,
       false,
-      boardRows ?? currentGame?.boardRows,
+      boardSize || { columns: currentGame?.boardColumns, rows: boardRows ?? currentGame?.boardRows },
     );
 
     clearTriviaTimer(lobbyCode);

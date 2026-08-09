@@ -16,13 +16,18 @@ const MINI_GAMES = [
   { id: "chase", label: "Chase" },
 ];
 
-const BOARD_ROW_OPTIONS = [3, 5, 7, 9];
+const BOARD_SIZE_OPTIONS = [
+  { label: "5x5", columns: 5, rows: 5 },
+  { label: "7x7", columns: 7, rows: 7 },
+  { label: "9x9", columns: 9, rows: 9 },
+  { label: "10x9", columns: 10, rows: 9 },
+];
 
 function Lobby({
   players,
   lobbyCode,
-  boardRows,
-  onBoardRowsChange,
+  boardSize,
+  onBoardSizeChange,
   onStart,
   onStartMiniGame,
 }) {
@@ -99,19 +104,26 @@ function Lobby({
         </button>
 
         <div className="board-length-section">
-          <p>BOARD ROWS</p>
+          <p>BOARD SIZE</p>
 
           <div className="board-length-options">
-            {BOARD_ROW_OPTIONS.map((rowCount) => (
+            {BOARD_SIZE_OPTIONS.map((option) => (
               <button
-                className={rowCount === boardRows ? "board-length-button selected" : "board-length-button"}
-                key={rowCount}
+                className={
+                  option.columns === boardSize.columns && option.rows === boardSize.rows
+                    ? "board-length-button selected"
+                    : "board-length-button"
+                }
+                key={option.label}
                 onClick={() => {
-                  onBoardRowsChange(rowCount);
+                  onBoardSizeChange({
+                    columns: option.columns,
+                    rows: option.rows,
+                  });
                 }}
                 type="button"
               >
-                {rowCount}
+                {option.label}
               </button>
             ))}
           </div>
