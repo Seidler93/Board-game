@@ -714,6 +714,19 @@ io.on("connection", (socket) => {
     );
   }
 
+  function haveRemainingPlayersResponded(lobbyCode, miniGame, responses) {
+    const responseIds = new Set(Object.keys(responses || {}));
+    const availablePlayers = getAvailableMiniGamePlayers(lobbyCode, miniGame);
+
+    return availablePlayers.every((player) => responseIds.has(player.id));
+  }
+
+  function getEligibleSubmissionVoters(lobbyCode, miniGame, submittedPlayerIds) {
+    return getAvailableMiniGamePlayers(lobbyCode, miniGame).filter((player) =>
+      submittedPlayerIds.some((submittedPlayerId) => submittedPlayerId !== player.id),
+    );
+  }
+
   function clearActiveGameTimers(lobbyCode) {
     clearTriviaTimer(lobbyCode);
     clearMostLikelyTimer(lobbyCode);
@@ -762,6 +775,10 @@ io.on("connection", (socket) => {
 
     for (const miniGame of miniGames) {
       if (miniGame && typeof miniGame.totalPlayers === "number") {
+        if (Array.isArray(miniGame.choices)) {
+          miniGame.choices = miniGame.choices.filter((choice) => choice.id !== playerId);
+        }
+
         if (Array.isArray(miniGame.participantIds)) {
           miniGame.participantIds = miniGame.participantIds.filter(
             (participantId) => participantId !== playerId,
@@ -792,6 +809,11 @@ io.on("connection", (socket) => {
     prunePlayerFromObject(game.captionThis?.captions, playerId);
     prunePlayerFromObject(game.captionThis?.votes, playerId);
     prunePlayerFromObject(game.chase?.players, playerId);
+
+    if (game.captionThis?.photoPlayerId === playerId) {
+      game.captionThis.photoPlayerId = "";
+      game.captionThis.photoPlayerName = "";
+    }
 
     if (game.firstTap?.pressOrder) {
       game.firstTap.pressOrder = game.firstTap.pressOrder.filter(
@@ -842,6 +864,171 @@ io.on("connection", (socket) => {
     io.to(lobbyCode).emit("worstAdviceResolved", null);
     io.to(lobbyCode).emit("captionThisResolved", null);
     io.to(lobbyCode).emit("chaseResolved", null);
+  }
+
+  function maybeAdvanceActiveMiniGame(lobbyCode) {
+    const game = getLobbyGame(lobbyCode);
+
+    if (!game) return false;
+
+    if (game.trivia) {
+      if (haveRemainingPlayersResponded(lobbyCode, game.trivia, game.trivia.answers)) {
+        resolveTrivia(lobbyCode);
+        return true;
+      }
+      emitTriviaState(lobbyCode);
+    }
+
+    if (game.mostLikely) {
+      if (haveRemainingPlayersResponded(lobbyCode, game.mostLikely, game.mostLikely.votes)) {
+        resolveMostLikely(lobbyCode);
+        return true;
+      }
+      emitMostLikelyState(lobbyCode);
+    }
+
+    if (game.rapidTap) {
+      if (haveRemainingPlayersResponded(lobbyCode, game.rapidTap, game.rapidTap.finalScores)) {
+        resolveRapidTap(lobbyCode);
+        return true;
+      }
+      emitRapidTapState(lobbyCode);
+    }
+
+    if (game.stopLine) {
+      if (haveRemainingPlayersResponded(lobbyCode, game.stopLine, game.stopLine.finalResults)) {
+        resolveStopLine(lobbyCode);
+        return true;
+      }
+      emitStopLineState(lobbyCode);
+    }
+
+    if (game.jumpBlock) {
+      if (haveRemainingPlayersResponded(lobbyCode, game.jumpBlock, game.jumpBlock.finalScores)) {
+        resolveJumpBlock(lobbyCode);
+        return true;
+      }
+      emitJumpBlockState(lobbyCode);
+    }
+
+    if (game.firstTap) {
+      if (haveRemainingPlayersResponded(lobbyCode, game.firstTap, game.firstTap.pressedPlayerIds)) {
+        resolveFirstTap(lobbyCode);
+        return true;
+      }
+      emitFirstTapState(lobbyCode);
+    }
+
+    if (game.pressRelease) {
+      if (haveRemainingPlayersResponded(lobbyCode, game.pressRelease, game.pressRelease.results)) {
+        resolvePressRelease(lobbyCode);
+        return true;
+      }
+      emitPressReleaseState(lobbyCode);
+    }
+
+    if (game.wordMath) {
+      if (haveRemainingPlayersResponded(lobbyCode, game.wordMath, game.wordMath.answers)) {
+        resolveWordMath(lobbyCode);
+        return true;
+      }
+      emitWordMathState(lobbyCode);
+    }
+
+    if (game.finishLyric) {
+      if (haveRemainingPlayersResponded(lobbyCode, game.finishLyric, game.finishLyric.answers)) {
+        resolveFinishLyric(lobbyCode);
+        return true;
+      }
+      emitFinishLyricState(lobbyCode);
+    }
+
+    if (game.drawImage) {
+      const submittedPlayerIds = Object.keys(game.drawImage.drawings);
+
+      if (
+        game.drawImage.stage === "drawing" &&
+        haveRemainingPlayersResponded(lobbyCode, game.drawImage, game.drawImage.drawings)
+      ) {
+        startDrawImageVoting(lobbyCode);
+        return true;
+      }
+
+      if (
+        game.drawImage.stage === "voting" &&
+        (submittedPlayerIds.length <= 1 ||
+          Object.keys(game.drawImage.votes).length >=
+            getEligibleSubmissionVoters(lobbyCode, game.drawImage, submittedPlayerIds).length)
+      ) {
+        resolveDrawImage(lobbyCode);
+        return true;
+      }
+
+      emitDrawImageState(lobbyCode);
+    }
+
+    if (game.worstAdvice) {
+      const submittedPlayerIds = Object.keys(game.worstAdvice.answers);
+
+      if (
+        game.worstAdvice.stage === "answering" &&
+        haveRemainingPlayersResponded(lobbyCode, game.worstAdvice, game.worstAdvice.answers)
+      ) {
+        startWorstAdviceVoting(lobbyCode);
+        return true;
+      }
+
+      if (
+        game.worstAdvice.stage === "voting" &&
+        (submittedPlayerIds.length <= 1 ||
+          Object.keys(game.worstAdvice.votes).length >=
+            getEligibleSubmissionVoters(lobbyCode, game.worstAdvice, submittedPlayerIds).length)
+      ) {
+        resolveWorstAdvice(lobbyCode);
+        return true;
+      }
+
+      emitWorstAdviceState(lobbyCode);
+    }
+
+    if (game.captionThis) {
+      const submittedPlayerIds = Object.keys(game.captionThis.captions);
+
+      if (game.captionThis.stage === "photo" && !game.captionThis.photoPlayerId) {
+        resolveCaptionThis(lobbyCode);
+        return true;
+      }
+
+      if (
+        game.captionThis.stage === "captioning" &&
+        haveRemainingPlayersResponded(lobbyCode, game.captionThis, game.captionThis.captions)
+      ) {
+        startCaptionThisVoting(lobbyCode);
+        return true;
+      }
+
+      if (
+        game.captionThis.stage === "voting" &&
+        (submittedPlayerIds.length <= 1 ||
+          Object.keys(game.captionThis.votes).length >=
+            getEligibleSubmissionVoters(lobbyCode, game.captionThis, submittedPlayerIds).length)
+      ) {
+        resolveCaptionThis(lobbyCode);
+        return true;
+      }
+
+      emitCaptionThisState(lobbyCode);
+    }
+
+    if (game.chase) {
+      if (!game.chase.players[game.chase.runnerId] || getMiniGamePlayers(lobbyCode, game.chase).length < 2) {
+        resolveChase(lobbyCode, false);
+        return true;
+      }
+      emitChaseState(lobbyCode);
+    }
+
+    return false;
   }
 
   function removePlayerFromLobby(lobbyCode, playerId, socketId) {
@@ -912,15 +1099,20 @@ io.on("connection", (socket) => {
         game.paused = false;
         game.pausedAt = null;
 
-        io.to(lobbyCode).emit("gameStateUpdated", game);
-        io.to(lobbyCode).emit("turnUpdated", {
-          currentPlayerId: game.currentPlayerId,
-        });
+        const miniGameAdvanced = maybeAdvanceActiveMiniGame(lobbyCode);
+
         io.to(lobbyCode).emit("gamePausedUpdated", {
           paused: false,
           disconnectedPlayers: [],
         });
-        emitActiveMiniGameState(lobbyCode, game);
+
+        if (!miniGameAdvanced) {
+          io.to(lobbyCode).emit("gameStateUpdated", game);
+          io.to(lobbyCode).emit("turnUpdated", {
+            currentPlayerId: game.currentPlayerId,
+          });
+          emitActiveMiniGameState(lobbyCode, game);
+        }
       }
     }
 
@@ -1914,7 +2106,7 @@ io.on("connection", (socket) => {
       ...rapidTap.scores,
       ...rapidTap.finalScores,
     };
-    const players = getMiniGamePlayers(lobbyCode, stopLine);
+    const players = getMiniGamePlayers(lobbyCode, rapidTap);
     const playerScores = players.map((player) => ({
       player,
       score: scores[player.id] || 0,
@@ -1971,7 +2163,7 @@ io.on("connection", (socket) => {
       ...stopLine.results,
       ...stopLine.finalResults,
     };
-    const players = getMiniGamePlayers(lobbyCode, jumpBlock);
+    const players = getMiniGamePlayers(lobbyCode, stopLine);
     const playerResults = players.map((player) => ({
       player,
       distance: results[player.id]?.distance ?? 100,
@@ -2033,7 +2225,7 @@ io.on("connection", (socket) => {
       ...jumpBlock.scores,
       ...jumpBlock.finalScores,
     };
-    const players = getMiniGamePlayers(lobbyCode, firstTap);
+    const players = getMiniGamePlayers(lobbyCode, jumpBlock);
     const playerScores = players.map((player) => ({
       player,
       score: scores[player.id] || 0,
@@ -2086,7 +2278,7 @@ io.on("connection", (socket) => {
     clearFirstTapTimer(lobbyCode);
 
     const firstTap = game.firstTap;
-    const players = getMiniGamePlayers(lobbyCode, pressRelease);
+    const players = getMiniGamePlayers(lobbyCode, firstTap);
     const pressedPlayerIds = new Set(
       firstTap.pressOrder.map((press) => press.playerId),
     );
@@ -2147,7 +2339,7 @@ io.on("connection", (socket) => {
     clearPressReleaseTimer(lobbyCode);
 
     const pressRelease = game.pressRelease;
-    const players = getLobbyPlayers(lobbyCode);
+    const players = getMiniGamePlayers(lobbyCode, pressRelease);
     const results = { ...pressRelease.results };
 
     for (const player of players) {
@@ -3958,10 +4150,10 @@ io.on("connection", (socket) => {
     drawImage.votes[player.id] = votedPlayerId;
     emitDrawImageState(player.lobbyCode);
 
-    const drawingPlayerIds = Object.keys(drawImage.drawings);
-    const eligibleVoters = getAvailableMiniGamePlayers(player.lobbyCode, drawImage).filter(
-      (lobbyPlayer) =>
-        drawingPlayerIds.some((drawingPlayerId) => drawingPlayerId !== lobbyPlayer.id),
+    const eligibleVoters = getEligibleSubmissionVoters(
+      player.lobbyCode,
+      drawImage,
+      Object.keys(drawImage.drawings),
     );
 
     if (Object.keys(drawImage.votes).length >= eligibleVoters.length) {
@@ -4033,10 +4225,10 @@ io.on("connection", (socket) => {
     worstAdvice.votes[player.id] = votedPlayerId;
     emitWorstAdviceState(player.lobbyCode);
 
-    const answerPlayerIds = Object.keys(worstAdvice.answers);
-    const eligibleVoters = getAvailableMiniGamePlayers(player.lobbyCode, worstAdvice).filter(
-      (lobbyPlayer) =>
-        answerPlayerIds.some((answerPlayerId) => answerPlayerId !== lobbyPlayer.id),
+    const eligibleVoters = getEligibleSubmissionVoters(
+      player.lobbyCode,
+      worstAdvice,
+      Object.keys(worstAdvice.answers),
     );
 
     if (Object.keys(worstAdvice.votes).length >= eligibleVoters.length) {
@@ -4135,10 +4327,10 @@ io.on("connection", (socket) => {
     captionThis.votes[player.id] = votedPlayerId;
     emitCaptionThisState(player.lobbyCode);
 
-    const captionPlayerIds = Object.keys(captionThis.captions);
-    const eligibleVoters = getAvailableMiniGamePlayers(player.lobbyCode, captionThis).filter(
-      (lobbyPlayer) =>
-        captionPlayerIds.some((captionPlayerId) => captionPlayerId !== lobbyPlayer.id),
+    const eligibleVoters = getEligibleSubmissionVoters(
+      player.lobbyCode,
+      captionThis,
+      Object.keys(captionThis.captions),
     );
 
     if (Object.keys(captionThis.votes).length >= eligibleVoters.length) {
