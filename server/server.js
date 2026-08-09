@@ -698,6 +698,22 @@ io.on("connection", (socket) => {
     return players.filter((player) => participantIds.includes(player.id));
   }
 
+  function getAvailableMiniGamePlayers(lobbyCode, miniGame) {
+    return getMiniGamePlayers(lobbyCode, miniGame).filter(
+      (player) => player.connected !== false,
+    );
+  }
+
+  function hasAllAvailablePlayersResponded(lobbyCode, miniGame, responses) {
+    const responseIds = new Set(Object.keys(responses || {}));
+    const availablePlayers = getAvailableMiniGamePlayers(lobbyCode, miniGame);
+
+    return (
+      availablePlayers.length > 0 &&
+      availablePlayers.every((player) => responseIds.has(player.id))
+    );
+  }
+
   function clearActiveGameTimers(lobbyCode) {
     clearTriviaTimer(lobbyCode);
     clearMostLikelyTimer(lobbyCode);
@@ -3799,7 +3815,7 @@ io.on("connection", (socket) => {
     trivia.answers[player.id] = choiceIndex;
     emitTriviaState(player.lobbyCode);
 
-    if (Object.keys(trivia.answers).length >= trivia.totalPlayers) {
+    if (hasAllAvailablePlayersResponded(player.lobbyCode, trivia, trivia.answers)) {
       resolveTrivia(player.lobbyCode);
     }
   });
@@ -3825,7 +3841,7 @@ io.on("connection", (socket) => {
     wordMath.answers[player.id] = choiceIndex;
     emitWordMathState(player.lobbyCode);
 
-    if (Object.keys(wordMath.answers).length >= wordMath.totalPlayers) {
+    if (hasAllAvailablePlayersResponded(player.lobbyCode, wordMath, wordMath.answers)) {
       resolveWordMath(player.lobbyCode);
     }
   });
@@ -3851,7 +3867,13 @@ io.on("connection", (socket) => {
     finishLyric.answers[player.id] = choiceIndex;
     emitFinishLyricState(player.lobbyCode);
 
-    if (Object.keys(finishLyric.answers).length >= finishLyric.totalPlayers) {
+    if (
+      hasAllAvailablePlayersResponded(
+        player.lobbyCode,
+        finishLyric,
+        finishLyric.answers,
+      )
+    ) {
       resolveFinishLyric(player.lobbyCode);
     }
   });
@@ -3906,7 +3928,7 @@ io.on("connection", (socket) => {
       );
     }
 
-    if (Object.keys(drawImage.drawings).length >= drawImage.totalPlayers) {
+    if (hasAllAvailablePlayersResponded(player.lobbyCode, drawImage, drawImage.drawings)) {
       startDrawImageVoting(player.lobbyCode);
     }
   });
@@ -3937,7 +3959,7 @@ io.on("connection", (socket) => {
     emitDrawImageState(player.lobbyCode);
 
     const drawingPlayerIds = Object.keys(drawImage.drawings);
-    const eligibleVoters = getMiniGamePlayers(player.lobbyCode, drawImage).filter(
+    const eligibleVoters = getAvailableMiniGamePlayers(player.lobbyCode, drawImage).filter(
       (lobbyPlayer) =>
         drawingPlayerIds.some((drawingPlayerId) => drawingPlayerId !== lobbyPlayer.id),
     );
@@ -3976,7 +3998,13 @@ io.on("connection", (socket) => {
 
     emitWorstAdviceState(player.lobbyCode);
 
-    if (Object.keys(worstAdvice.answers).length >= worstAdvice.totalPlayers) {
+    if (
+      hasAllAvailablePlayersResponded(
+        player.lobbyCode,
+        worstAdvice,
+        worstAdvice.answers,
+      )
+    ) {
       startWorstAdviceVoting(player.lobbyCode);
     }
   });
@@ -4006,7 +4034,7 @@ io.on("connection", (socket) => {
     emitWorstAdviceState(player.lobbyCode);
 
     const answerPlayerIds = Object.keys(worstAdvice.answers);
-    const eligibleVoters = getMiniGamePlayers(player.lobbyCode, worstAdvice).filter(
+    const eligibleVoters = getAvailableMiniGamePlayers(player.lobbyCode, worstAdvice).filter(
       (lobbyPlayer) =>
         answerPlayerIds.some((answerPlayerId) => answerPlayerId !== lobbyPlayer.id),
     );
@@ -4072,7 +4100,13 @@ io.on("connection", (socket) => {
 
     emitCaptionThisState(player.lobbyCode);
 
-    if (Object.keys(captionThis.captions).length >= captionThis.totalPlayers) {
+    if (
+      hasAllAvailablePlayersResponded(
+        player.lobbyCode,
+        captionThis,
+        captionThis.captions,
+      )
+    ) {
       startCaptionThisVoting(player.lobbyCode);
     }
   });
@@ -4102,7 +4136,7 @@ io.on("connection", (socket) => {
     emitCaptionThisState(player.lobbyCode);
 
     const captionPlayerIds = Object.keys(captionThis.captions);
-    const eligibleVoters = getMiniGamePlayers(player.lobbyCode, captionThis).filter(
+    const eligibleVoters = getAvailableMiniGamePlayers(player.lobbyCode, captionThis).filter(
       (lobbyPlayer) =>
         captionPlayerIds.some((captionPlayerId) => captionPlayerId !== lobbyPlayer.id),
     );
@@ -4166,7 +4200,7 @@ io.on("connection", (socket) => {
     mostLikely.votes[player.id] = votedPlayerId;
     emitMostLikelyState(player.lobbyCode);
 
-    if (Object.keys(mostLikely.votes).length >= mostLikely.totalPlayers) {
+    if (hasAllAvailablePlayersResponded(player.lobbyCode, mostLikely, mostLikely.votes)) {
       resolveMostLikely(player.lobbyCode);
     }
   });
@@ -4217,7 +4251,13 @@ io.on("connection", (socket) => {
     rapidTap.finalScores[player.id] = finalScore;
     emitRapidTapState(player.lobbyCode);
 
-    if (Object.keys(rapidTap.finalScores).length >= rapidTap.totalPlayers) {
+    if (
+      hasAllAvailablePlayersResponded(
+        player.lobbyCode,
+        rapidTap,
+        rapidTap.finalScores,
+      )
+    ) {
       resolveRapidTap(player.lobbyCode);
     }
   });
@@ -4274,7 +4314,13 @@ io.on("connection", (socket) => {
     stopLine.finalResults[player.id] = result;
     emitStopLineState(player.lobbyCode);
 
-    if (Object.keys(stopLine.finalResults).length >= stopLine.totalPlayers) {
+    if (
+      hasAllAvailablePlayersResponded(
+        player.lobbyCode,
+        stopLine,
+        stopLine.finalResults,
+      )
+    ) {
       resolveStopLine(player.lobbyCode);
     }
   });
@@ -4331,7 +4377,13 @@ io.on("connection", (socket) => {
     jumpBlock.finalScores[player.id] = finalScore;
     emitJumpBlockState(player.lobbyCode);
 
-    if (Object.keys(jumpBlock.finalScores).length >= jumpBlock.totalPlayers) {
+    if (
+      hasAllAvailablePlayersResponded(
+        player.lobbyCode,
+        jumpBlock,
+        jumpBlock.finalScores,
+      )
+    ) {
       resolveJumpBlock(player.lobbyCode);
     }
   });
@@ -4362,7 +4414,13 @@ io.on("connection", (socket) => {
     });
     emitFirstTapState(player.lobbyCode);
 
-    if (firstTap.pressOrder.length >= firstTap.totalPlayers) {
+    if (
+      hasAllAvailablePlayersResponded(
+        player.lobbyCode,
+        firstTap,
+        firstTap.pressedPlayerIds,
+      )
+    ) {
       resolveFirstTap(player.lobbyCode);
     }
   });
@@ -4398,7 +4456,13 @@ io.on("connection", (socket) => {
 
     emitPressReleaseState(player.lobbyCode);
 
-    if (Object.keys(pressRelease.results).length >= pressRelease.totalPlayers) {
+    if (
+      hasAllAvailablePlayersResponded(
+        player.lobbyCode,
+        pressRelease,
+        pressRelease.results,
+      )
+    ) {
       resolvePressRelease(player.lobbyCode);
     }
   });
