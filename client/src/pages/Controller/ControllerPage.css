@@ -681,6 +681,13 @@ body.controller-page-active #root {
   color: #111;
 }
 
+.controller-screen .draw-action-button:disabled,
+.controller-screen .draw-action-button.primary:disabled {
+  background: #343434;
+  color: #777;
+  cursor: default;
+}
+
 .draw-vote-list {
   width: min(92dvw, 620px);
   max-height: 54dvh;
