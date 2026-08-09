@@ -4,6 +4,7 @@ import { getServerOrigin } from "../../serverOrigin";
 import "./ControllerPage.css";
 
 const SERVER_ORIGIN = getServerOrigin();
+const SAVED_CONTROLLER_SESSION_KEY = "boardGameControllerSession";
 const MOVE_BACK_SOUND_URL = `${SERVER_ORIGIN}/music/${encodeURIComponent("freesound_community-wah-ah-108289.mp3")}`;
 const WINNING_SOUND_URL = `${SERVER_ORIGIN}/music/${encodeURIComponent("winning sound.mp3")}`;
 const DICE_FACE_URLS = {
@@ -31,6 +32,39 @@ function DiceFace({ roll }) {
       draggable="false"
     />
   );
+}
+
+function getSavedControllerSession() {
+  try {
+    const savedSession = JSON.parse(
+      window.localStorage.getItem(SAVED_CONTROLLER_SESSION_KEY) || "null",
+    );
+
+    if (!savedSession?.name || !savedSession?.lobbyCode) return null;
+
+    return {
+      name: String(savedSession.name),
+      lobbyCode: String(savedSession.lobbyCode).toUpperCase(),
+      avatar: typeof savedSession.avatar === "string" ? savedSession.avatar : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveControllerSession(session) {
+  window.localStorage.setItem(
+    SAVED_CONTROLLER_SESSION_KEY,
+    JSON.stringify({
+      name: session.name,
+      lobbyCode: session.lobbyCode,
+      avatar: session.avatar || "",
+    }),
+  );
+}
+
+function clearControllerSession() {
+  window.localStorage.removeItem(SAVED_CONTROLLER_SESSION_KEY);
 }
 
 function ControllerPage() {
@@ -172,12 +206,37 @@ function ControllerPage() {
   }, []);
 
   useEffect(() => {
+    const savedSession = getSavedControllerSession();
+
+    if (!savedSession) return;
+
+    setName(savedSession.name);
+    setLobbyCode(savedSession.lobbyCode);
+    setAvatar(savedSession.avatar);
+
+    const joinSavedSession = () => {
+      socket.emit("joinLobby", savedSession);
+    };
+
+    if (socket.connected) {
+      joinSavedSession();
+    }
+
+    socket.on("connect", joinSavedSession);
+
+    return () => {
+      socket.off("connect", joinSavedSession);
+    };
+  }, []);
+
+  useEffect(() => {
     socket.on("joinSuccess", (player) => {
       setPlayerId(player.id);
       setJoined(true);
     });
 
     socket.on("leftLobby", () => {
+      clearControllerSession();
       setPlayerId("");
       setJoined(false);
       setReady(false);
@@ -227,6 +286,7 @@ function ControllerPage() {
     });
 
     socket.on("gameEnded", () => {
+      clearControllerSession();
       setName("");
       setLobbyCode("");
       setAvatar("");
@@ -1533,6 +1593,7 @@ function ControllerPage() {
   }
 
   function leaveGame() {
+    clearControllerSession();
     setSettingsOpen(false);
     setJoined(false);
     setReady(false);
@@ -1634,10 +1695,15 @@ function ControllerPage() {
         <button
           disabled={!name.trim() || !lobbyCode.trim()}
           onClick={() => {
-            socket.emit("joinLobby", {
+            const nextSession = {
               name: name.trim(),
-              lobbyCode: lobbyCode.trim(),
+              lobbyCode: lobbyCode.trim().toUpperCase(),
               avatar,
+            };
+
+            saveControllerSession(nextSession);
+            socket.emit("joinLobby", {
+              ...nextSession,
             });
           }}
         >
