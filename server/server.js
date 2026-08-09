@@ -1859,7 +1859,7 @@ io.on("connection", (socket) => {
     const losingPlayerIds = Object.entries(voteCounts)
       .filter(([, count]) => count === topVoteCount && count > 0)
       .map(([playerId]) => playerId);
-    const players = getMiniGamePlayers(lobbyCode, rapidTap);
+    const players = getMiniGamePlayers(lobbyCode, mostLikely);
     const penalties = [];
 
     for (const playerId of losingPlayerIds) {
