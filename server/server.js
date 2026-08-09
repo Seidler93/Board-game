@@ -3658,6 +3658,16 @@ io.on("connection", (socket) => {
     io.to(lobbyCode).emit("playersUpdated", []);
   });
 
+  socket.on("forceNextTurn", ({ lobbyCode }) => {
+    const game = getLobbyGame(lobbyCode);
+
+    if (!game || game.phase === "awaitingRoll" || game.phase === "moving") return;
+
+    clearActiveMiniGameState(lobbyCode, game);
+    clearTurnResolutionTimer(lobbyCode);
+    finishTurn(lobbyCode);
+  });
+
   socket.on("rollDice", () => {
     const player = socket.data.player;
 

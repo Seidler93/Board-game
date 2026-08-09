@@ -563,6 +563,11 @@ function GamePage() {
             lobbyCode,
           });
         }}
+        onForceNextTurn={() => {
+          socket.emit("forceNextTurn", {
+            lobbyCode,
+          });
+        }}
       />
     );
   }

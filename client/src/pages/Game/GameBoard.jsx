@@ -116,6 +116,7 @@ function GameBoard({
   onRollMovementComplete,
   onRestart,
   onQuit,
+  onForceNextTurn,
 }) {
   const tileCount = BOARD_COLUMNS * BOARD_ROWS;
   const [displayedPositions, setDisplayedPositions] = useState({});
@@ -134,6 +135,34 @@ function GameBoard({
   const resumeMusicAfterDrawRef = useRef(false);
 
   const currentTrack = musicTracks[currentTrackIndex];
+  const hasMiniGameModal = Boolean(
+    trivia ||
+      triviaResult ||
+      mostLikely ||
+      mostLikelyResult ||
+      rapidTap ||
+      rapidTapResult ||
+      stopLine ||
+      stopLineResult ||
+      jumpBlock ||
+      jumpBlockResult ||
+      firstTap ||
+      firstTapResult ||
+      pressRelease ||
+      pressReleaseResult ||
+      wordMath ||
+      wordMathResult ||
+      finishLyric ||
+      finishLyricResult ||
+      drawImage ||
+      drawImageResult ||
+      worstAdvice ||
+      worstAdviceResult ||
+      captionThis ||
+      captionThisResult ||
+      chase ||
+      chaseResult,
+  );
 
   const playMovementPop = useCallback(() => {
     if (!movementAudioRef.current) {
@@ -829,6 +858,17 @@ function GameBoard({
             </div>
           </div>
         </div>
+      )}
+
+      {hasMiniGameModal && (
+        <button
+          className="force-next-turn-button"
+          aria-label="Force next turn"
+          title="Force next turn"
+          onClick={onForceNextTurn}
+        >
+          &gt;
+        </button>
       )}
 
       {trivia && (
