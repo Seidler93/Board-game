@@ -225,6 +225,23 @@ body.controller-page-active #root {
   color: transparent;
 }
 
+.join-status-message {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(14px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  margin: 0;
+  overflow: hidden;
+  color: #a8a8a8;
+  font-size: clamp(13px, 2.2dvh, 17px);
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ready-button {
   background: #444;
   color: white;

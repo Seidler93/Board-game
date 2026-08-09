@@ -6,6 +6,7 @@ import "./ControllerPage.css";
 const SERVER_ORIGIN = getServerOrigin();
 const SAVED_CONTROLLER_SESSION_KEY = "boardGameControllerSession";
 const DRAW_AUTO_SUBMIT_LEAD_MS = 350;
+const JOIN_TIMEOUT_MS = 7000;
 const MOVE_BACK_SOUND_URL = `${SERVER_ORIGIN}/music/${encodeURIComponent("freesound_community-wah-ah-108289.mp3")}`;
 const WINNING_SOUND_URL = `${SERVER_ORIGIN}/music/${encodeURIComponent("winning sound.mp3")}`;
 const DICE_FACE_URLS = {
@@ -144,6 +145,8 @@ function ControllerPage() {
   const [pausedPlayers, setPausedPlayers] = useState([]);
   const [miniGameNow, setMiniGameNow] = useState(Date.now());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [joinStatus, setJoinStatus] = useState("Not connected yet");
+  const [joining, setJoining] = useState(false);
   const tapCountRef = useRef(0);
   const rapidTapSubmittedRef = useRef(false);
   const stopLineSubmittedRef = useRef(false);
@@ -162,6 +165,81 @@ function ControllerPage() {
     lastX: 0,
     lastY: 0,
   });
+
+  function updateJoinStatus(message, details) {
+    setJoinStatus(message);
+
+    if (details !== undefined) {
+      console.info("[controller join]", message, details);
+    } else {
+      console.info("[controller join]", message);
+    }
+  }
+
+  function attemptJoin(session, source = "manual") {
+    const nextSession = {
+      name: String(session.name || "").trim(),
+      lobbyCode: String(session.lobbyCode || "").trim().toUpperCase(),
+      avatar: session.avatar || "",
+    };
+
+    if (!nextSession.name || !nextSession.lobbyCode) {
+      updateJoinStatus("Enter a lobby code and name", { source, nextSession });
+      return;
+    }
+
+    if (!socket.connected) {
+      updateJoinStatus("Connecting to server...", {
+        source,
+        server: SERVER_ORIGIN,
+        socketId: socket.id,
+      });
+      socket.connect();
+    }
+
+    setJoining(true);
+    updateJoinStatus("Joining lobby...", {
+      source,
+      server: SERVER_ORIGIN,
+      lobbyCode: nextSession.lobbyCode,
+      name: nextSession.name,
+      connected: socket.connected,
+      socketId: socket.id,
+    });
+
+    socket
+      .timeout(JOIN_TIMEOUT_MS)
+      .emit("joinLobby", nextSession, (error, response) => {
+        setJoining(false);
+
+        if (error) {
+          clearControllerSession();
+          updateJoinStatus("Failed to join: server did not respond", {
+            source,
+            error,
+            server: SERVER_ORIGIN,
+            connected: socket.connected,
+          });
+          return;
+        }
+
+        if (!response?.ok) {
+          clearControllerSession();
+          updateJoinStatus(response?.message || "Failed to join lobby", {
+            source,
+            response,
+          });
+          return;
+        }
+
+        saveControllerSession(nextSession);
+        updateJoinStatus("Joined lobby", {
+          source,
+          playerId: response.player?.id,
+          lobbyCode: nextSession.lobbyCode,
+        });
+      });
+  }
 
   useEffect(() => {
     document.body.classList.add("controller-page-active");
@@ -214,9 +292,14 @@ function ControllerPage() {
     setName(savedSession.name);
     setLobbyCode(savedSession.lobbyCode);
     setAvatar(savedSession.avatar);
+    updateJoinStatus("Saved lobby found. Rejoining...", {
+      server: SERVER_ORIGIN,
+      lobbyCode: savedSession.lobbyCode,
+      name: savedSession.name,
+    });
 
     const joinSavedSession = () => {
-      socket.emit("joinLobby", savedSession);
+      attemptJoin(savedSession, "saved-session");
     };
 
     if (socket.connected) {
@@ -231,7 +314,47 @@ function ControllerPage() {
   }, []);
 
   useEffect(() => {
+    const handleConnect = () => {
+      updateJoinStatus(joined ? "Connected" : "Connected. Ready to join.", {
+        server: SERVER_ORIGIN,
+        socketId: socket.id,
+      });
+    };
+
+    const handleConnectError = (error) => {
+      setJoining(false);
+      updateJoinStatus("Failed to connect to server", {
+        server: SERVER_ORIGIN,
+        message: error.message,
+      });
+    };
+
+    const handleDisconnect = (reason) => {
+      setJoining(false);
+      updateJoinStatus("Disconnected from server", {
+        reason,
+        server: SERVER_ORIGIN,
+      });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("connect_error", handleConnectError);
+    socket.on("disconnect", handleDisconnect);
+
+    if (socket.connected) {
+      updateJoinStatus("Connected. Ready to join.", {
+        server: SERVER_ORIGIN,
+        socketId: socket.id,
+      });
+    }
+
     socket.on("joinSuccess", (player) => {
+      setJoining(false);
+      updateJoinStatus("Joined lobby", {
+        playerId: player.id,
+        lobbyCode: player.lobbyCode,
+        name: player.name,
+      });
       setPlayerId(player.id);
       setJoined(true);
     });
@@ -247,6 +370,8 @@ function ControllerPage() {
       setGamePaused(false);
       setPausedPlayers([]);
       setSettingsOpen(false);
+      setJoining(false);
+      updateJoinStatus("Left lobby");
     });
 
     socket.on("readyUpdated", (newReadyState) => {
@@ -882,6 +1007,9 @@ function ControllerPage() {
     });
 
     return () => {
+      socket.off("connect", handleConnect);
+      socket.off("connect_error", handleConnectError);
+      socket.off("disconnect", handleDisconnect);
       socket.off("joinSuccess");
       socket.off("leftLobby");
       socket.off("readyUpdated");
@@ -1727,22 +1855,21 @@ function ControllerPage() {
         </label>
 
         <button
-          disabled={!name.trim() || !lobbyCode.trim()}
+          disabled={joining || !name.trim() || !lobbyCode.trim()}
           onClick={() => {
-            const nextSession = {
+            attemptJoin({
               name: name.trim(),
               lobbyCode: lobbyCode.trim().toUpperCase(),
               avatar,
-            };
-
-            saveControllerSession(nextSession);
-            socket.emit("joinLobby", {
-              ...nextSession,
             });
           }}
         >
-          JOIN GAME
+          {joining ? "JOINING..." : "JOIN GAME"}
         </button>
+
+        <p className="join-status-message">
+          {joinStatus}
+        </p>
       </div>
     );
   }

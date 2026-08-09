@@ -3461,9 +3461,27 @@ io.on("connection", (socket) => {
     emitGameSnapshotToSocket(socket, lobbyCode);
   });
 
-  socket.on("joinLobby", ({ name, lobbyCode, avatar }) => {
+  socket.on("joinLobby", ({ name, lobbyCode, avatar } = {}, acknowledge) => {
     const trimmedName = String(name || "").trim();
-    const roster = getLobbyRoster(lobbyCode);
+    const normalizedLobbyCode = String(lobbyCode || "").trim().toUpperCase();
+
+    console.info("Join attempt:", {
+      socketId: socket.id,
+      name: trimmedName,
+      lobbyCode: normalizedLobbyCode,
+    });
+
+    if (!trimmedName) {
+      acknowledge?.({ ok: false, message: "Failed to join: missing player name" });
+      return;
+    }
+
+    if (!normalizedLobbyCode) {
+      acknowledge?.({ ok: false, message: "Failed to join: missing lobby code" });
+      return;
+    }
+
+    const roster = getLobbyRoster(normalizedLobbyCode);
     const existingPlayer = roster.find(
       (rosterPlayer) =>
         normalizePlayerName(rosterPlayer.name) === normalizePlayerName(trimmedName),
@@ -3474,14 +3492,14 @@ io.on("connection", (socket) => {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         name: trimmedName,
         ready: false,
-        lobbyCode,
+        lobbyCode: normalizedLobbyCode,
         avatar: "",
         connected: false,
         socketId: "",
       };
 
     player.name = trimmedName || player.name;
-    player.lobbyCode = lobbyCode;
+    player.lobbyCode = normalizedLobbyCode;
     player.connected = true;
     player.socketId = socket.id;
 
@@ -3493,7 +3511,7 @@ io.on("connection", (socket) => {
       roster.push(player);
     }
 
-    const game = getLobbyGame(lobbyCode);
+    const game = getLobbyGame(normalizedLobbyCode);
 
     if (game && !existingPlayer && game.positions[player.id] === undefined) {
       game.positions[player.id] = 0;
@@ -3501,16 +3519,17 @@ io.on("connection", (socket) => {
 
     socket.data.player = player;
 
-    socket.join(lobbyCode);
+    socket.join(normalizedLobbyCode);
 
-    io.to(lobbyCode).emit("playersUpdated", getLobbyPlayers(lobbyCode));
-    emitPauseState(lobbyCode);
+    io.to(normalizedLobbyCode).emit("playersUpdated", getLobbyPlayers(normalizedLobbyCode));
+    emitPauseState(normalizedLobbyCode);
 
     if (game) {
-      io.to(lobbyCode).emit("gameStateUpdated", game);
+      io.to(normalizedLobbyCode).emit("gameStateUpdated", game);
     }
 
     socket.emit("joinSuccess", player);
+    acknowledge?.({ ok: true, player });
   });
 
   socket.on("requestGameSnapshot", () => {
