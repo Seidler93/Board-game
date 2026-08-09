@@ -1532,6 +1532,26 @@ function ControllerPage() {
     );
   }
 
+  function leaveGame() {
+    setSettingsOpen(false);
+    setJoined(false);
+    setReady(false);
+    setGameStarted(false);
+    setCurrentPlayerId("");
+    setMyLastRoll(null);
+    setGamePaused(false);
+    setPausedPlayers([]);
+
+    socket.emit(
+      "leaveLobby",
+      {
+        lobbyCode,
+        playerId,
+      },
+      () => {},
+    );
+  }
+
   const settingsOverlay = (
     <>
       <button
@@ -1550,9 +1570,7 @@ function ControllerPage() {
             <button
               className="controller-leave-button"
               type="button"
-              onClick={() => {
-                socket.emit("leaveLobby");
-              }}
+              onClick={leaveGame}
             >
               LEAVE GAME
             </button>

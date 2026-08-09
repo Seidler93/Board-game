@@ -3498,16 +3498,21 @@ io.on("connection", (socket) => {
     emitGameSnapshotToSocket(socket, player.lobbyCode);
   });
 
-  socket.on("leaveLobby", () => {
+  socket.on("leaveLobby", (payload = {}, acknowledge) => {
     const player = socket.data.player;
+    const lobbyCode = player?.lobbyCode || String(payload.lobbyCode || "").trim();
+    const playerId = player?.id || String(payload.playerId || "").trim();
 
-    if (!player?.lobbyCode) return;
+    if (!lobbyCode || !playerId) {
+      acknowledge?.({ ok: false });
+      return;
+    }
 
-    const lobbyCode = player.lobbyCode;
-
-    removePlayerFromLobby(lobbyCode, player.id, socket.id);
+    const removedPlayer = removePlayerFromLobby(lobbyCode, playerId, socket.id);
     socket.leave(lobbyCode);
+    socket.data.player = null;
     socket.emit("leftLobby");
+    acknowledge?.({ ok: Boolean(removedPlayer) });
   });
 
   socket.on("startGame", ({ lobbyCode }) => {
