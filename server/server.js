@@ -4706,10 +4706,13 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("toggleReady", () => {
+  socket.on("toggleReady", (acknowledge) => {
     const player = socket.data.player;
 
-    if (!player) return;
+    if (!player) {
+      acknowledge?.({ ok: false, message: "Not joined to a lobby" });
+      return;
+    }
 
     player.ready = !player.ready;
 
@@ -4719,6 +4722,7 @@ io.on("connection", (socket) => {
     io.to(lobbyCode).emit("playersUpdated", players);
 
     socket.emit("readyUpdated", player.ready);
+    acknowledge?.({ ok: true, ready: player.ready });
   });
 
   socket.on("disconnect", () => {

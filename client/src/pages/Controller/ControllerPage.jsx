@@ -213,7 +213,6 @@ function ControllerPage() {
         setJoining(false);
 
         if (error) {
-          clearControllerSession();
           updateJoinStatus("Failed to join: server did not respond", {
             source,
             error,
@@ -233,10 +232,58 @@ function ControllerPage() {
         }
 
         saveControllerSession(nextSession);
+        if (response.player?.id) {
+          setPlayerId(response.player.id);
+          setJoined(true);
+        }
         updateJoinStatus("Joined lobby", {
           source,
           playerId: response.player?.id,
           lobbyCode: nextSession.lobbyCode,
+        });
+      });
+  }
+
+  function handleReadyToggle() {
+    if (!joined) return;
+
+    const savedSession = getSavedControllerSession() || {
+      name,
+      lobbyCode,
+      avatar,
+    };
+
+    updateJoinStatus("Updating ready...", {
+      lobbyCode,
+      playerId,
+      socketId: socket.id,
+      connected: socket.connected,
+    });
+
+    socket
+      .timeout(JOIN_TIMEOUT_MS)
+      .emit("toggleReady", (error, response) => {
+        if (error) {
+          updateJoinStatus("Ready update timed out. Rejoining...", {
+            error,
+            connected: socket.connected,
+          });
+          attemptJoin(savedSession, "ready-timeout-rejoin");
+          return;
+        }
+
+        if (!response?.ok) {
+          updateJoinStatus("Ready update failed. Rejoining...", {
+            response,
+          });
+          attemptJoin(savedSession, "ready-failed-rejoin");
+          return;
+        }
+
+        setReady(response.ready);
+        updateJoinStatus(response.ready ? "Ready" : "Not ready", {
+          playerId,
+          lobbyCode,
         });
       });
   }
@@ -3062,9 +3109,7 @@ function ControllerPage() {
 
       <button
         className={ready ? "ready-button active" : "ready-button"}
-        onClick={() => {
-          socket.emit("toggleReady");
-        }}
+        onClick={handleReadyToggle}
       >
         {ready ? "READY" : "NOT READY"}
       </button>
