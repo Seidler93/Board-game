@@ -4,6 +4,7 @@ import socket from "../../socket";
 import GameBoard from "./GameBoard";
 
 const DEFAULT_LOBBY_CODE = "ABCD";
+const DEFAULT_BOARD_ROWS = 9;
 
 function GamePage() {
   const [players, setPlayers] = useState([]);
@@ -37,6 +38,7 @@ function GamePage() {
   const [chase, setChase] = useState(null);
   const [chaseResult, setChaseResult] = useState(null);
   const [winner, setWinner] = useState(null);
+  const [selectedBoardRows, setSelectedBoardRows] = useState(DEFAULT_BOARD_ROWS);
   const lobbyCode =
     new URLSearchParams(window.location.search).get("lobby")?.toUpperCase() ||
     DEFAULT_LOBBY_CODE;
@@ -524,6 +526,8 @@ function GamePage() {
       <GameBoard
         players={players}
         positions={gameState?.positions || {}}
+        boardColumns={gameState?.boardColumns || 10}
+        boardRows={gameState?.boardRows || DEFAULT_BOARD_ROWS}
         currentPlayerId={gameState?.currentPlayerId || ""}
         lastRoll={lastRoll}
         trivia={trivia}
@@ -587,6 +591,7 @@ function GamePage() {
           setWinner(null);
           socket.emit("restartGame", {
             lobbyCode,
+            boardRows: gameState?.boardRows || selectedBoardRows,
           });
         }}
         onQuit={() => {
@@ -607,15 +612,19 @@ function GamePage() {
     <Lobby
       players={players}
       lobbyCode={lobbyCode}
+      boardRows={selectedBoardRows}
+      onBoardRowsChange={setSelectedBoardRows}
       onStart={() => {
         socket.emit("startGame", {
           lobbyCode,
+          boardRows: selectedBoardRows,
         });
       }}
       onStartMiniGame={(miniGameType) => {
         socket.emit("startTestMiniGame", {
           lobbyCode,
           miniGameType,
+          boardRows: selectedBoardRows,
         });
       }}
     />

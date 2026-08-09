@@ -87,7 +87,10 @@ const io = new Server(server, {
 
 const games = new Map();
 const lobbyRosters = new Map();
-const BOARD_TILE_COUNT = 90;
+const BOARD_COLUMNS = 10;
+const DEFAULT_BOARD_ROWS = 9;
+const MIN_BOARD_ROWS = 3;
+const MAX_BOARD_ROWS = 9;
 const ROLL_STEP_MS = 280;
 const TRIVIA_PENALTY_REVEAL_MS = 1200;
 const TRIVIA_TILE_POSITIONS = new Set([6, 14, 23, 31, 42, 55, 67, 76, 88]);
@@ -130,6 +133,22 @@ const FIRST_TAP_MAX_WAIT_MS = 15000;
 const PRESS_RELEASE_DURATION_MS = 15000;
 const PRESS_RELEASE_MIN_TARGET_MS = 5000;
 const PRESS_RELEASE_MAX_TARGET_MS = 10000;
+
+function normalizeBoardRows(boardRows) {
+  const numericRows = Number(boardRows);
+
+  if (!Number.isFinite(numericRows)) return DEFAULT_BOARD_ROWS;
+
+  const roundedRows = Math.round(numericRows);
+  const clampedRows = Math.max(MIN_BOARD_ROWS, Math.min(MAX_BOARD_ROWS, roundedRows));
+
+  return clampedRows % 2 === 0 ? clampedRows - 1 : clampedRows;
+}
+
+function getBoardTileCount(game) {
+  return BOARD_COLUMNS * normalizeBoardRows(game?.boardRows);
+}
+
 const triviaTimers = new Map();
 const mostLikelyTimers = new Map();
 const rapidTapTimers = new Map();
@@ -1329,12 +1348,17 @@ io.on("connection", (socket) => {
     });
   }
 
-  function createBaseGame(lobbyCode, players, testMode = false) {
+  function createBaseGame(lobbyCode, players, testMode = false, boardRows = DEFAULT_BOARD_ROWS) {
+    const normalizedBoardRows = normalizeBoardRows(boardRows);
+
     return {
       lobbyCode,
       started: true,
       testMode,
       testModeEnding: false,
+      boardColumns: BOARD_COLUMNS,
+      boardRows: normalizedBoardRows,
+      tileCount: BOARD_COLUMNS * normalizedBoardRows,
       paused: false,
       pausedPlayerIds: [],
       currentPlayerId: testMode ? null : players[0]?.id || null,
@@ -1453,7 +1477,7 @@ io.on("connection", (socket) => {
 
     clearTurnResolutionTimer(lobbyCode);
 
-    if (game.pendingLandingPosition >= BOARD_TILE_COUNT - 1) {
+    if (game.pendingLandingPosition >= getBoardTileCount(game) - 1) {
       const players = getLobbyPlayers(lobbyCode);
       const winner = players.find(
         (player) => player.id === game.pendingRollingPlayerId,
@@ -3765,12 +3789,12 @@ io.on("connection", (socket) => {
     acknowledge?.({ ok: Boolean(removedPlayer) });
   });
 
-  socket.on("startGame", ({ lobbyCode }) => {
+  socket.on("startGame", ({ lobbyCode, boardRows }) => {
     const players = getLobbyPlayers(lobbyCode);
 
     if (players.length === 0 || players.some((player) => !player.connected)) return;
 
-    const game = createBaseGame(lobbyCode, players);
+    const game = createBaseGame(lobbyCode, players, false, boardRows);
 
     clearTriviaTimer(lobbyCode);
     clearMostLikelyTimer(lobbyCode);
@@ -3790,7 +3814,7 @@ io.on("connection", (socket) => {
     emitGameState(lobbyCode);
   });
 
-  socket.on("startTestMiniGame", ({ lobbyCode, miniGameType }) => {
+  socket.on("startTestMiniGame", ({ lobbyCode, miniGameType, boardRows }) => {
     const players = getLobbyPlayers(lobbyCode);
 
     if (players.length === 0 || players.some((player) => !player.connected)) return;
@@ -3810,7 +3834,7 @@ io.on("connection", (socket) => {
     clearChaseTimer(lobbyCode);
     clearTurnResolutionTimer(lobbyCode);
 
-    const game = createBaseGame(lobbyCode, players, true);
+    const game = createBaseGame(lobbyCode, players, true, boardRows);
 
     games.set(lobbyCode, game);
     emitGameState(lobbyCode);
@@ -3821,12 +3845,18 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("restartGame", ({ lobbyCode }) => {
+  socket.on("restartGame", ({ lobbyCode, boardRows }) => {
     const players = getLobbyPlayers(lobbyCode);
 
     if (players.length === 0 || players.some((player) => !player.connected)) return;
 
-    const game = createBaseGame(lobbyCode, players);
+    const currentGame = getLobbyGame(lobbyCode);
+    const game = createBaseGame(
+      lobbyCode,
+      players,
+      false,
+      boardRows ?? currentGame?.boardRows,
+    );
 
     clearTriviaTimer(lobbyCode);
     clearMostLikelyTimer(lobbyCode);
@@ -3926,7 +3956,7 @@ io.on("connection", (socket) => {
     const players = getLobbyPlayers(player.lobbyCode);
     const roll = Math.floor(Math.random() * 6) + 1;
     const fromPosition = game.positions?.[player.id] || 0;
-    const toPosition = Math.min(fromPosition + roll, BOARD_TILE_COUNT - 1);
+    const toPosition = Math.min(fromPosition + roll, getBoardTileCount(game) - 1);
     const path = [];
 
     for (let position = fromPosition + 1; position <= toPosition; position += 1) {

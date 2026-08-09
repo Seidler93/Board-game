@@ -47,11 +47,11 @@ body.game-page-active #root {
   position: relative;
   width: min(
     calc(74dvw - max(30px, env(safe-area-inset-left) + env(safe-area-inset-right))),
-    calc((100dvh - max(30px, env(safe-area-inset-top) + env(safe-area-inset-bottom))) * 1.111)
+    calc((100dvh - max(30px, env(safe-area-inset-top) + env(safe-area-inset-bottom))) * var(--board-ratio))
   );
   max-width: 100%;
   max-height: 100%;
-  aspect-ratio: 10 / 9;
+  aspect-ratio: var(--board-columns) / var(--board-rows);
   display: grid;
   box-sizing: border-box;
   grid-template-columns: repeat(var(--board-columns), 1fr);

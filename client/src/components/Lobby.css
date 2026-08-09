@@ -185,9 +185,50 @@
   cursor: not-allowed;
 }
 
+.board-length-section {
+  width: min(100%, 300px);
+  margin-top: clamp(14px, 2.4dvh, 22px);
+  display: grid;
+  gap: clamp(8px, 1.4dvh, 12px);
+}
+
+.board-length-section p {
+  margin: 0;
+  color: #888;
+  font-size: clamp(11px, 1.8dvh, 14px);
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.board-length-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.board-length-button {
+  min-width: 0;
+  aspect-ratio: 1;
+  border: 2px solid #333;
+  border-radius: 10px;
+  background: #202020;
+  color: white;
+  cursor: pointer;
+  font-size: clamp(16px, 2.8dvh, 24px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.board-length-button.selected {
+  border-color: white;
+  background: white;
+  color: #111;
+}
+
 .mini-games-section {
   width: min(100%, 420px);
-  margin-top: clamp(18px, 3dvh, 28px);
+  margin-top: clamp(14px, 2.4dvh, 24px);
   display: flex;
   flex-direction: column;
   gap: clamp(10px, 1.8dvh, 14px);

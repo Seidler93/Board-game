@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getServerOrigin } from "../../serverOrigin";
 import "./GameBoard.css";
 
-const BOARD_COLUMNS = 10;
-const BOARD_ROWS = 9;
+const DEFAULT_BOARD_COLUMNS = 10;
+const DEFAULT_BOARD_ROWS = 9;
 const SERVER_ORIGIN = getServerOrigin();
 const MOVEMENT_POP_URL = `${SERVER_ORIGIN}/music/${encodeURIComponent("universfield-bubble-pop-04-323580.mp3")}`;
 const MOVE_BACK_SOUND_URL = `${SERVER_ORIGIN}/music/${encodeURIComponent("freesound_community-wah-ah-108289.mp3")}`;
@@ -43,21 +43,21 @@ function getPlayerInitial(name) {
   return name?.trim().charAt(0).toUpperCase() || "?";
 }
 
-function getTileCoordinates(position) {
-  const safePosition = Math.max(0, Math.min(position, BOARD_COLUMNS * BOARD_ROWS - 1));
-  const row = Math.floor(safePosition / BOARD_COLUMNS);
-  const columnInRow = safePosition % BOARD_COLUMNS;
-  const column = row % 2 === 0 ? columnInRow : BOARD_COLUMNS - 1 - columnInRow;
+function getTileCoordinates(position, boardColumns, tileCount) {
+  const safePosition = Math.max(0, Math.min(position, tileCount - 1));
+  const row = Math.floor(safePosition / boardColumns);
+  const columnInRow = safePosition % boardColumns;
+  const column = row % 2 === 0 ? columnInRow : boardColumns - 1 - columnInRow;
 
   return { row, column };
 }
 
-function getSnakePositionFromGridIndex(index) {
-  const row = Math.floor(index / BOARD_COLUMNS);
-  const column = index % BOARD_COLUMNS;
-  const columnInPath = row % 2 === 0 ? column : BOARD_COLUMNS - 1 - column;
+function getSnakePositionFromGridIndex(index, boardColumns) {
+  const row = Math.floor(index / boardColumns);
+  const column = index % boardColumns;
+  const columnInPath = row % 2 === 0 ? column : boardColumns - 1 - column;
 
-  return row * BOARD_COLUMNS + columnInPath;
+  return row * boardColumns + columnInPath;
 }
 
 function isMiniGameStarted(miniGame) {
@@ -82,6 +82,8 @@ function DiceFace({ roll }) {
 function GameBoard({
   players,
   positions,
+  boardColumns = DEFAULT_BOARD_COLUMNS,
+  boardRows = DEFAULT_BOARD_ROWS,
   currentPlayerId,
   lastRoll,
   trivia,
@@ -118,7 +120,7 @@ function GameBoard({
   onQuit,
   onForceNextTurn,
 }) {
-  const tileCount = BOARD_COLUMNS * BOARD_ROWS;
+  const tileCount = boardColumns * boardRows;
   const [displayedPositions, setDisplayedPositions] = useState({});
   const [movingPlayerId, setMovingPlayerId] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -449,7 +451,8 @@ function GameBoard({
     const tileCounts = {};
 
     return players.map((player, playerIndex) => {
-      const position = displayedPositions[player.id] ?? positions[player.id] ?? 0;
+      const rawPosition = displayedPositions[player.id] ?? positions[player.id] ?? 0;
+      const position = Math.max(0, Math.min(rawPosition, tileCount - 1));
       const tileStackIndex = tileCounts[position] || 0;
 
       tileCounts[position] = tileStackIndex + 1;
@@ -461,7 +464,7 @@ function GameBoard({
         tileStackIndex,
       };
     });
-  }, [displayedPositions, players, positions]);
+  }, [displayedPositions, players, positions, tileCount]);
 
   if (chase) {
     return (
@@ -591,27 +594,30 @@ function GameBoard({
         <div
           className="game-board"
           style={{
-            "--board-columns": BOARD_COLUMNS,
-            "--board-rows": BOARD_ROWS,
+            "--board-columns": boardColumns,
+            "--board-rows": boardRows,
+            "--board-ratio": boardColumns / boardRows,
+            aspectRatio: `${boardColumns} / ${boardRows}`,
           }}
         >
           {Array.from({ length: tileCount }, (_, index) => {
-            const boardPosition = getSnakePositionFromGridIndex(index);
+            const boardPosition = getSnakePositionFromGridIndex(index, boardColumns);
             const isStart = index === 0;
             const isFinish = index === tileCount - 1;
-            const isTrivia = TRIVIA_TILE_POSITIONS.has(boardPosition);
-            const isMostLikely = MOST_LIKELY_TILE_POSITIONS.has(boardPosition);
-            const isRapidTap = RAPID_TAP_TILE_POSITIONS.has(boardPosition);
-            const isStopLine = STOP_LINE_TILE_POSITIONS.has(boardPosition);
-            const isJumpBlock = JUMP_BLOCK_TILE_POSITIONS.has(boardPosition);
-            const isFirstTap = FIRST_TAP_TILE_POSITIONS.has(boardPosition);
-            const isPressRelease = PRESS_RELEASE_TILE_POSITIONS.has(boardPosition);
-            const isWordMath = WORD_MATH_TILE_POSITIONS.has(boardPosition);
-            const isFinishLyric = FINISH_LYRIC_TILE_POSITIONS.has(boardPosition);
-            const isDrawImage = DRAW_IMAGE_TILE_POSITIONS.has(boardPosition);
-            const isWorstAdvice = WORST_ADVICE_TILE_POSITIONS.has(boardPosition);
-            const isCaptionThis = CAPTION_THIS_TILE_POSITIONS.has(boardPosition);
-            const isChase = CHASE_TILE_POSITIONS.has(boardPosition);
+            const isPlayableTile = !isStart && !isFinish;
+            const isTrivia = isPlayableTile && TRIVIA_TILE_POSITIONS.has(boardPosition);
+            const isMostLikely = isPlayableTile && MOST_LIKELY_TILE_POSITIONS.has(boardPosition);
+            const isRapidTap = isPlayableTile && RAPID_TAP_TILE_POSITIONS.has(boardPosition);
+            const isStopLine = isPlayableTile && STOP_LINE_TILE_POSITIONS.has(boardPosition);
+            const isJumpBlock = isPlayableTile && JUMP_BLOCK_TILE_POSITIONS.has(boardPosition);
+            const isFirstTap = isPlayableTile && FIRST_TAP_TILE_POSITIONS.has(boardPosition);
+            const isPressRelease = isPlayableTile && PRESS_RELEASE_TILE_POSITIONS.has(boardPosition);
+            const isWordMath = isPlayableTile && WORD_MATH_TILE_POSITIONS.has(boardPosition);
+            const isFinishLyric = isPlayableTile && FINISH_LYRIC_TILE_POSITIONS.has(boardPosition);
+            const isDrawImage = isPlayableTile && DRAW_IMAGE_TILE_POSITIONS.has(boardPosition);
+            const isWorstAdvice = isPlayableTile && WORST_ADVICE_TILE_POSITIONS.has(boardPosition);
+            const isCaptionThis = isPlayableTile && CAPTION_THIS_TILE_POSITIONS.has(boardPosition);
+            const isChase = isPlayableTile && CHASE_TILE_POSITIONS.has(boardPosition);
 
             return (
               <div
@@ -658,7 +664,7 @@ function GameBoard({
 
           <div className="player-piece-layer">
             {playersWithBoardPosition.map((player) => {
-              const { row, column } = getTileCoordinates(player.position);
+              const { row, column } = getTileCoordinates(player.position, boardColumns, tileCount);
               const offsetDirection = player.tileStackIndex % 2 === 0 ? -1 : 1;
               const offsetMagnitude = Math.ceil(player.tileStackIndex / 2) * 18;
 

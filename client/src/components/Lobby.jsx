@@ -16,7 +16,16 @@ const MINI_GAMES = [
   { id: "chase", label: "Chase" },
 ];
 
-function Lobby({ players, lobbyCode, onStart, onStartMiniGame }) {
+const BOARD_ROW_OPTIONS = [3, 5, 7, 9];
+
+function Lobby({
+  players,
+  lobbyCode,
+  boardRows,
+  onBoardRowsChange,
+  onStart,
+  onStartMiniGame,
+}) {
   const allReady =
     players.length >= 2 &&
     players.every((player) => player.connected !== false) &&
@@ -88,6 +97,25 @@ function Lobby({ players, lobbyCode, onStart, onStartMiniGame }) {
         >
           START GAME
         </button>
+
+        <div className="board-length-section">
+          <p>BOARD ROWS</p>
+
+          <div className="board-length-options">
+            {BOARD_ROW_OPTIONS.map((rowCount) => (
+              <button
+                className={rowCount === boardRows ? "board-length-button selected" : "board-length-button"}
+                key={rowCount}
+                onClick={() => {
+                  onBoardRowsChange(rowCount);
+                }}
+                type="button"
+              >
+                {rowCount}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="mini-games-section">
           <p>TEST A MINI GAME</p>
