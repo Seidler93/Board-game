@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1",
-    "install:all": "npm --prefix server install && npm --prefix client install",
+    "install:all": "npm --prefix server install && npm --prefix client install --include=dev",
     "build": "npm --prefix client run build",
     "render-build": "npm run install:all && npm run build",
     "start": "node server/server.js"
