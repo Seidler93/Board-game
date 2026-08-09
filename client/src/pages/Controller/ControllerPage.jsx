@@ -457,6 +457,35 @@ function ControllerPage() {
 
     socket.on("gameStateUpdated", (game) => {
       setGamePaused(game?.paused || false);
+
+      if (["awaitingRoll", "gameOver"].includes(game?.phase)) {
+        setTrivia(null);
+        setTriviaResult(null);
+        setWordMath(null);
+        setWordMathResult(null);
+        setFinishLyric(null);
+        setFinishLyricResult(null);
+        setDrawImage(null);
+        setDrawImageResult(null);
+        setWorstAdvice(null);
+        setWorstAdviceResult(null);
+        setCaptionThis(null);
+        setCaptionThisResult(null);
+        setChase(null);
+        setChaseResult(null);
+        setMostLikely(null);
+        setMostLikelyResult(null);
+        setRapidTap(null);
+        setRapidTapResult(null);
+        setStopLine(null);
+        setStopLineResult(null);
+        setJumpBlock(null);
+        setJumpBlockResult(null);
+        setFirstTap(null);
+        setFirstTapResult(null);
+        setPressRelease(null);
+        setPressReleaseResult(null);
+      }
     });
 
     socket.on("gamePausedUpdated", ({ paused, disconnectedPlayers }) => {

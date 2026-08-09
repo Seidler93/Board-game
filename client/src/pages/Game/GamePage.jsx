@@ -50,6 +50,37 @@ function GamePage() {
   }, []);
 
   useEffect(() => {
+    if (!["awaitingRoll", "gameOver"].includes(gameState?.phase)) return;
+
+    setTrivia(null);
+    setTriviaResult(null);
+    setMostLikely(null);
+    setMostLikelyResult(null);
+    setRapidTap(null);
+    setRapidTapResult(null);
+    setStopLine(null);
+    setStopLineResult(null);
+    setJumpBlock(null);
+    setJumpBlockResult(null);
+    setFirstTap(null);
+    setFirstTapResult(null);
+    setPressRelease(null);
+    setPressReleaseResult(null);
+    setWordMath(null);
+    setWordMathResult(null);
+    setFinishLyric(null);
+    setFinishLyricResult(null);
+    setDrawImage(null);
+    setDrawImageResult(null);
+    setWorstAdvice(null);
+    setWorstAdviceResult(null);
+    setCaptionThis(null);
+    setCaptionThisResult(null);
+    setChase(null);
+    setChaseResult(null);
+  }, [gameState?.phase]);
+
+  useEffect(() => {
     socket.on("playersUpdated", (updatedPlayers) => {
       setPlayers(updatedPlayers);
     });
