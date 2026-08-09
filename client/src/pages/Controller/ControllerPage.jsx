@@ -5,6 +5,7 @@ import "./ControllerPage.css";
 
 const SERVER_ORIGIN = getServerOrigin();
 const SAVED_CONTROLLER_SESSION_KEY = "boardGameControllerSession";
+const DRAW_AUTO_SUBMIT_LEAD_MS = 350;
 const MOVE_BACK_SOUND_URL = `${SERVER_ORIGIN}/music/${encodeURIComponent("freesound_community-wah-ah-108289.mp3")}`;
 const WINNING_SOUND_URL = `${SERVER_ORIGIN}/music/${encodeURIComponent("winning sound.mp3")}`;
 const DICE_FACE_URLS = {
@@ -1335,9 +1336,13 @@ function ControllerPage() {
       });
     };
 
+    const submitAt =
+      typeof drawImage.drawingEndsAt === "number"
+        ? drawImage.drawingEndsAt
+        : drawImage.endsAt;
     const finalTimer = window.setTimeout(
       submitDrawing,
-      Math.max(0, drawImage.endsAt - Date.now()),
+      Math.max(0, submitAt - Date.now() - DRAW_AUTO_SUBMIT_LEAD_MS),
     );
 
     return () => {

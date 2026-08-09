@@ -106,6 +106,7 @@ const CHASE_TILE_POSITIONS = new Set([52]);
 const TRIVIA_DURATION_MS = 30000;
 const DRAW_IMAGE_DURATION_MS = 30000;
 const DRAW_IMAGE_VOTE_DURATION_MS = 30000;
+const DRAW_IMAGE_LATE_SUBMIT_GRACE_MS = 2500;
 const WORST_ADVICE_DURATION_MS = 45000;
 const WORST_ADVICE_VOTE_DURATION_MS = 30000;
 const CAPTION_THIS_PHOTO_DURATION_MS = 60000;
@@ -2763,16 +2764,13 @@ io.on("connection", (socket) => {
     io.to(lobbyCode).emit("gameStateUpdated", game);
     emitDrawImageState(lobbyCode);
 
-    if (Object.keys(drawImage.drawings).length <= 1) {
-      resolveDrawImage(lobbyCode);
-      return;
-    }
-
     drawImageTimers.set(
       lobbyCode,
       setTimeout(() => {
         resolveDrawImage(lobbyCode);
-      }, DRAW_IMAGE_VOTE_DURATION_MS),
+      }, Object.keys(drawImage.drawings).length <= 1
+        ? DRAW_IMAGE_LATE_SUBMIT_GRACE_MS
+        : DRAW_IMAGE_VOTE_DURATION_MS),
     );
   }
 
@@ -3850,12 +3848,17 @@ io.on("connection", (socket) => {
       typeof image === "string" &&
       image.startsWith("data:image/png;base64,") &&
       image.length < 650000;
+    const isDrawingStage = drawImage?.stage === "drawing";
+    const isLateDrawingSubmission =
+      drawImage?.stage === "voting" &&
+      typeof drawImage.drawingEndsAt === "number" &&
+      Date.now() <= drawImage.drawingEndsAt + DRAW_IMAGE_LATE_SUBMIT_GRACE_MS;
 
     if (
       !drawImage ||
       drawImage.id !== drawImageId ||
       !isMiniGameParticipant(drawImage, player.id) ||
-      drawImage.stage !== "drawing" ||
+      (!isDrawingStage && !isLateDrawingSubmission) ||
       Date.now() < drawImage.playStartsAt ||
       drawImage.drawings[player.id] ||
       !isValidImage
@@ -3870,6 +3873,19 @@ io.on("connection", (socket) => {
     };
 
     emitDrawImageState(player.lobbyCode);
+
+    if (
+      drawImage.stage === "voting" &&
+      Object.keys(drawImage.drawings).length >= 2
+    ) {
+      clearDrawImageTimer(player.lobbyCode);
+      drawImageTimers.set(
+        player.lobbyCode,
+        setTimeout(() => {
+          resolveDrawImage(player.lobbyCode);
+        }, Math.max(0, drawImage.votingEndsAt - Date.now())),
+      );
+    }
 
     if (Object.keys(drawImage.drawings).length >= drawImage.totalPlayers) {
       startDrawImageVoting(player.lobbyCode);
